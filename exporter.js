@@ -2,6 +2,44 @@
 (function() {
     'use strict';
 
+    // 全局变量声明
+    let JSZip, saveAs;
+
+    // 动态加载 JSZip 和 FileSaver.js
+    function loadScript(src, callback) {
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL(src);
+        script.onload = callback;
+        (document.head || document.documentElement).appendChild(script);
+    }
+
+    // 等待两个库都加载完成后才继续执行
+    function waitForLibraries(resolveAfterReady) {
+        if (typeof JSZip === 'undefined' || typeof saveAs === 'undefined') {
+            setTimeout(() => waitForLibraries(resolveAfterReady), 100);
+        } else {
+            JSZip = window.JSZip;
+            saveAs = window.saveAs;
+            resolveAfterReady();
+        }
+    }
+
+    // // 动态加载 JSZip 和 FileSaver.js
+    // if (typeof JSZip === 'undefined' || typeof saveAs === 'undefined') {
+    //     const scriptJSZip = document.createElement('script');
+    //     scriptJSZip.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    //     scriptJSZip.onload = () => {
+    //         const scriptFileSaver = document.createElement('script');
+    //         scriptFileSaver.src = 'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js';
+    //         scriptFileSaver.onload = () => {
+    //             console.log('ZIP 库已加载完成');
+    //             // 现在可以安全调用 exportNotesWithZip()
+    //         };
+    //         document.head.appendChild(scriptFileSaver);
+    //     };
+    //     document.head.appendChild(scriptJSZip);
+    // }
+
     // 防止重复注入
     if (window.noteExporterInjected) {
         return;
@@ -317,44 +355,85 @@
                 images: images.length 
             });
 
-            utils.sendMessage('EXPORT_PROGRESS', { progress: 70, message: '开始导出文件...' });
+            // utils.sendMessage('EXPORT_PROGRESS', { progress: 70, message: '开始导出文件...' });
 
-            // 导出处理
+            // // 导出处理
+            // const folderMap = Object.fromEntries(folders.map(f => [f.id, f.subject]));
+            // const imageMap = Object.fromEntries(images.map(img => [img.id, img.image]));
+            // const fileNameCounter = {};
+
+            // for (let i = 0; i < notes.length; i++) {
+            //     const note = notes[i];
+            //     const folderName = folderMap[note.folderId] || '默认文件夹';
+            //     const fileName = fileHandler.generateFileName(note, fileNameCounter);
+            //     const { content, imageFiles } = fileHandler.convertToMarkdown(note, imageMap);
+                
+            //     // 下载Markdown文件
+            //     utils.downloadFile(`${folderName}_${fileName}.md`, content, 'text/markdown');
+                
+            //     // 下载图片文件
+            //     imageFiles.forEach(imageFile => {
+            //         utils.downloadImage(`${folderName}_${fileName}_${imageFile.name}`, imageFile.data);
+            //     });
+
+            //     const progress = 70 + (i / notes.length) * 30;
+            //     utils.sendMessage('EXPORT_PROGRESS', { 
+            //         progress: progress, 
+            //         message: `导出文件 ${i + 1}/${notes.length}` 
+            //     });
+
+            //     // 等待一段时间以避免请求过快
+            //     await new Promise(resolve => setTimeout(resolve, 100));
+                
+            // }
+
+            // utils.sendMessage('EXPORT_COMPLETE', { 
+            //     folders: folders.length, 
+            //     notes: notes.length, 
+            //     images: images.length 
+            // });
+            utils.sendMessage('EXPORT_PROGRESS', { progress: 70, message: '开始打包为 ZIP...' });
+
+            const zip = new JSZip();
             const folderMap = Object.fromEntries(folders.map(f => [f.id, f.subject]));
             const imageMap = Object.fromEntries(images.map(img => [img.id, img.image]));
             const fileNameCounter = {};
+            const notesFolder = zip.folder("notes");
 
             for (let i = 0; i < notes.length; i++) {
                 const note = notes[i];
                 const folderName = folderMap[note.folderId] || '默认文件夹';
                 const fileName = fileHandler.generateFileName(note, fileNameCounter);
                 const { content, imageFiles } = fileHandler.convertToMarkdown(note, imageMap);
-                
-                // 下载Markdown文件
-                utils.downloadFile(`${folderName}_${fileName}.md`, content, 'text/markdown');
-                
-                // 下载图片文件
+
+                // 创建对应文件夹并写入 Markdown 文件
+                notesFolder.folder(folderName).file(`${fileName}.md`, content);
+
+                // 写入图片文件
+                const imageFolder = notesFolder.folder(`${folderName}/images`);
                 imageFiles.forEach(imageFile => {
-                    utils.downloadImage(`${folderName}_${fileName}_${imageFile.name}`, imageFile.data);
+                    const base64Data = imageFile.data.split(',')[1]; // 去掉 data:image/png;base64,
+                    imageFolder.file(imageFile.name, base64Data, { base64: true });
                 });
 
-                const progress = 70 + (i / notes.length) * 30;
-                utils.sendMessage('EXPORT_PROGRESS', { 
-                    progress: progress, 
-                    message: `导出文件 ${i + 1}/${notes.length}` 
+                const progress = 70 + (i / notes.length) * 29;
+                utils.sendMessage('EXPORT_PROGRESS', {
+                    progress: Math.round(progress),
+                    message: `打包笔记 ${i + 1}/${notes.length}`
                 });
 
-                // 等待一段时间以避免请求过快
-                await new Promise(resolve => setTimeout(resolve, 100));
-                
+                await new Promise(resolve => setTimeout(resolve, 50));
             }
 
-            utils.sendMessage('EXPORT_COMPLETE', { 
-                folders: folders.length, 
-                notes: notes.length, 
-                images: images.length 
-            });
+            // 生成 ZIP 并触发下载
+            const blob = await zip.generateAsync({ type: "blob" });
+            utils.downloadFile("MiNote_导出笔记.zip", blob, "application/zip");
 
+            utils.sendMessage('EXPORT_COMPLETE', {
+                folders: folders.length,
+                notes: notes.length,
+                images: images.length
+            });
         } catch (error) {
             console.error('导出失败:', error);
             utils.sendMessage('EXPORT_ERROR', { error: error.message });

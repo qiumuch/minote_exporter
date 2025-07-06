@@ -4,6 +4,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         // 这里会被exporter.js中的实际导出脚本替换
         // 目前只是一个占位符，实际的导出逻辑在exporter.js中
         sendResponse({success: true});
+
     }
 });
 
