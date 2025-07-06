@@ -3,42 +3,15 @@
     'use strict';
 
     // 全局变量声明
-    let JSZip, saveAs;
+    const JSZip = window.JSZip;
+    const saveAs = window.saveAs;
 
-    // 动态加载 JSZip 和 FileSaver.js
-    function loadScript(src, callback) {
-        const script = document.createElement('script');
-        script.src = chrome.runtime.getURL(src);
-        script.onload = callback;
-        (document.head || document.documentElement).appendChild(script);
+    // 确保库已加载
+    if (typeof JSZip === 'undefined' || typeof saveAs === 'undefined') {
+        console.error('JSZip 或 FileSaver 库未正确加载');
+        utils.sendMessage('EXPORT_ERROR', { error: 'JSZip 或 FileSaver 库未正确加载' });
+        return;
     }
-
-    // 等待两个库都加载完成后才继续执行
-    function waitForLibraries(resolveAfterReady) {
-        if (typeof JSZip === 'undefined' || typeof saveAs === 'undefined') {
-            setTimeout(() => waitForLibraries(resolveAfterReady), 100);
-        } else {
-            JSZip = window.JSZip;
-            saveAs = window.saveAs;
-            resolveAfterReady();
-        }
-    }
-
-    // // 动态加载 JSZip 和 FileSaver.js
-    // if (typeof JSZip === 'undefined' || typeof saveAs === 'undefined') {
-    //     const scriptJSZip = document.createElement('script');
-    //     scriptJSZip.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-    //     scriptJSZip.onload = () => {
-    //         const scriptFileSaver = document.createElement('script');
-    //         scriptFileSaver.src = 'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js';
-    //         scriptFileSaver.onload = () => {
-    //             console.log('ZIP 库已加载完成');
-    //             // 现在可以安全调用 exportNotesWithZip()
-    //         };
-    //         document.head.appendChild(scriptFileSaver);
-    //     };
-    //     document.head.appendChild(scriptJSZip);
-    // }
 
     // 防止重复注入
     if (window.noteExporterInjected) {
@@ -159,72 +132,6 @@
             const response = await network.fetchWithRetry(url);
             return response.json();
         }
-    //         /**
-    //  * Fetches an image as data URL.
-    //  * Reference: https://www.cnblogs.com/cyfeng/p/16107747.html
-    //  * 
-    //  * @param id The image ID.
-    //  */
-    // async function fetchImage(id) {
-    //     let image;
-
-    //     {
-    //         const exceptions = [];
-    //         for(let i = 0; i < maxAttempts; i++) {
-    //             try {
-    //                 image = new Image();
-    //                 /**
-    //                  * Tainted canvases may not be exported.
-    //                  * See https://www.cnblogs.com/iroading/p/11011268.html.
-    //                  */
-    //                 image.setAttribute('crossOrigin', 'anonymous');
-    //                 image.src = substitute(urls['image'], { id });
-    //                 await new Promise((resolve, reject) => {
-    //                     image.addEventListener('load', resolve);
-    //                     image.addEventListener('error', reject);
-    //                 });
-    //                 break;
-    //             } catch(exception) {
-    //                 exceptions.push(exception);
-    //             }
-    //         }
-    //         if(exceptions.length) { //Remember !![] === true.
-    //             window.failures ? window.failures.push(...exceptions) : window.failures = exceptions;
-    //             throw new Error('Too many failed trials. For more information, check out window.failures.');
-    //         }
-    //     }
-
-    //     const canvas = document.createElement('canvas');
-    //     const { width, height } = image; //  获取图片的宽度和高度
-    //     canvas.width = width; //  设置canvas的宽度和高度
-    //     canvas.height = height;
-    //     canvas.getContext('2d').drawImage(image, 0, 0, width, height); //  在canvas上绘制图片
-    //     return canvas.toDataURL('image/png'); //  将canvas转换为png格式的base64字符串
-    // }
-    
-    // /**
-    //  * Requests a page and returns the result in JSON.
-    //  * If failed, the request will be retried for `maxAttempts` time(s).
-    //  * 
-    //  * @param key The key of the URL in the var `urls`.
-    //  * @param attributes Attributes.
-    //  */
-    // async function query(key, attributes = {}) {
-    //     const exceptions = []; //  定义一个数组，用于存储异常信息
-    //     for(let i = 0; i < maxAttempts; i++) { //  循环maxAttempts次
-    //         try {
-    //             return await (await fetch(substitute(urls[key], {
-    //                 time: (new Date()).getTime(),
-    //                 ...attributes
-    //             }))).json();
-    //         }
-    //         catch(exception) {
-    //             exceptions.push(exception);
-    //         }
-    //     }
-    //     window.failures ? window.failures.push(...exceptions) : window.failures = exceptions;
-    //     throw new Error('Too many failed trials. For more information, check out window.failures.');
-    // }
     };
 
     // 文件处理
@@ -355,43 +262,6 @@
                 images: images.length 
             });
 
-            // utils.sendMessage('EXPORT_PROGRESS', { progress: 70, message: '开始导出文件...' });
-
-            // // 导出处理
-            // const folderMap = Object.fromEntries(folders.map(f => [f.id, f.subject]));
-            // const imageMap = Object.fromEntries(images.map(img => [img.id, img.image]));
-            // const fileNameCounter = {};
-
-            // for (let i = 0; i < notes.length; i++) {
-            //     const note = notes[i];
-            //     const folderName = folderMap[note.folderId] || '默认文件夹';
-            //     const fileName = fileHandler.generateFileName(note, fileNameCounter);
-            //     const { content, imageFiles } = fileHandler.convertToMarkdown(note, imageMap);
-                
-            //     // 下载Markdown文件
-            //     utils.downloadFile(`${folderName}_${fileName}.md`, content, 'text/markdown');
-                
-            //     // 下载图片文件
-            //     imageFiles.forEach(imageFile => {
-            //         utils.downloadImage(`${folderName}_${fileName}_${imageFile.name}`, imageFile.data);
-            //     });
-
-            //     const progress = 70 + (i / notes.length) * 30;
-            //     utils.sendMessage('EXPORT_PROGRESS', { 
-            //         progress: progress, 
-            //         message: `导出文件 ${i + 1}/${notes.length}` 
-            //     });
-
-            //     // 等待一段时间以避免请求过快
-            //     await new Promise(resolve => setTimeout(resolve, 100));
-                
-            // }
-
-            // utils.sendMessage('EXPORT_COMPLETE', { 
-            //     folders: folders.length, 
-            //     notes: notes.length, 
-            //     images: images.length 
-            // });
             utils.sendMessage('EXPORT_PROGRESS', { progress: 70, message: '开始打包为 ZIP...' });
 
             const zip = new JSZip();
