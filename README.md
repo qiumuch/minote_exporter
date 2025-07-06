@@ -1,6 +1,6 @@
-# 笔记导出助手 Chrome 插件
+# 小米便签导出助手 Chrome 插件
 
-一个专门用于导出网页笔记为 Markdown 格式的 Chrome 浏览器插件。
+一个专门用于将小米笔记导出为 Markdown 格式文件的 Chrome 浏览器插件。
 
 ## 功能特点
 
