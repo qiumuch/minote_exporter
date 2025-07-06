@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "笔记导出助手",
+  "version": "1.0.0",
+  "description": "将网页笔记导出为Markdown文件，支持图片和文件夹结构",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "笔记导出助手"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
