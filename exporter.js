@@ -161,7 +161,8 @@
                     if (imageMap[imageId]) {
                         const imageName = `${imageId}.png`;
                         imageFiles.push({ name: imageName, data: imageMap[imageId] });
-                        return `![${imageName}](images/${imageName})`;
+                        // return `![${imageName}](images/${imageName})`;
+                        return `![[${imageName}]]`;
                     } else {
                         console.warn(`图片未找到，无法在Markdown中引用: ${imageId}`);
                         return `![图片未找到: ${imageId}]()`;
@@ -280,7 +281,8 @@
                 notesFolder.folder(folderName).file(`${fileName}.md`, content);
 
                 // 写入图片文件
-                const imageFolder = notesFolder.folder(`${folderName}/images`);
+                // const imageFolder = notesFolder.folder(`${folderName}/images`);
+                const imageFolder = notesFolder.folder(`images`);
                 imageFiles.forEach(imageFile => {
                     const base64Data = imageFile.data.split(',')[1]; // 去掉 data:image/png;base64,
                     imageFolder.file(imageFile.name, base64Data, { base64: true });
