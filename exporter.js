@@ -70,6 +70,12 @@
             } catch (error) {
                 console.error('消息发送失败:', error);
             }
+        },
+
+        decodeHtmlText: (encodedStr) => {
+            var parser = new DOMParser();
+            var dom = parser.parseFromString('<!DOCTYPE html><body>' + encodedStr, 'text/html');
+            return dom.body.textContent || "";
         }
     };
 
@@ -138,21 +144,39 @@
     const fileHandler = {
         generateFileName: (note, fileNameCounter) => {
             const dateStr = utils.formatDate(note.createDate);
-            const title = note.title?.trim();
+
+            let title = '';
+            if (note.extraInfo) {
+                try {
+                    const extraInfo = JSON.parse(note.extraInfo);
+                    title = extraInfo.title || '';
+                } catch (e) {
+                    console.warn(`解析笔记额外信息失败: ${e.message}`);
+                }
+            }
+            // const title = note.extraInfo.title?.trim();
             
             if (title) {
-                return utils.sanitizeFileName(`${dateStr}_${title}`);
+                return utils.sanitizeFileName(`${dateStr} ${title}`);
             }
             
             const preview = note.content.split('\n')[0].substring(0, 10);
             const count = fileNameCounter[dateStr] = (fileNameCounter[dateStr] || 0) + 1;
-            const suffix = count > 1 ? `_${count}` : '';
+            const suffix = count > 1 ? ` ${count}` : '';
             
-            return utils.sanitizeFileName(`${dateStr}${suffix}_${preview}`);
+            return utils.sanitizeFileName(`${dateStr}${suffix} ${preview}`).trim();
         },
 
         convertToMarkdown: (note, imageMap) => {
-            const lines = note.content.replace(/\<0\/\>\<.*?\/\>/g, '').split('\n');
+            note.content = note.content.replace(/\<0\/\>\<.*?\/\>/g, '').
+                                replace(/<background[^>]*>|<\/background>/g,'==').
+                                replace(/<b>|<\/b>/g,'**').
+                                replace(/<bullet \/>/g,'- ').
+                                replace(/<input[^>]*\/>/g,'- [ ] ').
+                                replace(/[~-]{2,}/g,'————');   //两个换行符之间两个或更多 - 或 ~，且不包含其他字符的字符串，替换为————
+
+            const lines = note.content.split('\n');
+            // const lines = note.content.replace(/\<0\/\>\<.*?\/\>/g, '').split('\n');
             const imageFiles = [];
             
             const processedLines = lines.map(line => {
@@ -171,12 +195,15 @@
                 return line;
             });
 
-            let content = processedLines.join('\n');
+            let content = utils.decodeHtmlText(
+                processedLines.join('\n').replace(/<[^>]+>/g, '')        // 移除所有HTML标签
+            );
+
             if (note.title) {
                 content = `# ${note.title}\n\n${content}`;
             }
             
-            content += `\n\n---\n创建时间: ${new Date(note.createDate).toLocaleString()}\n修改时间: ${new Date(note.modifyDate).toLocaleString()}`;
+            // content += `\n\n---\n创建时间: ${new Date(note.createDate).toLocaleString()}\n修改时间: ${new Date(note.modifyDate).toLocaleString()}`;
             
             return { content, imageFiles };
         }
@@ -273,9 +300,9 @@
 
             for (let i = 0; i < notes.length; i++) {
                 const note = notes[i];
-                const folderName = folderMap[note.folderId] || '默认文件夹';
-                const fileName = fileHandler.generateFileName(note, fileNameCounter);
+                const folderName = utils.sanitizeFileName(folderMap[note.folderId] || '未分类');
                 const { content, imageFiles } = fileHandler.convertToMarkdown(note, imageMap);
+                const fileName = fileHandler.generateFileName(note, fileNameCounter);
 
                 // 创建对应文件夹并写入 Markdown 文件
                 notesFolder.folder(folderName).file(`${fileName}.md`, content);
